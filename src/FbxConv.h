@@ -92,16 +92,79 @@ class FbxConv {
 		}
 
 		bool execute(Settings * const &settings) {
+#if 0
 			bool result = false;
-			modeldata::Model *model = new modeldata::Model();
-			if (load(settings, model)) {
-				if (settings->verbose)
-					info(model);
-				if (save(settings, model))
-					result = true;
+			
+			Settings settings2 = *settings;
+			settings2.inFile = "./cube_anim1.fbx";
+			modeldata::Model *model2 = new modeldata::Model();
+			if (!load(&settings2, model2)) {
+				delete model2;
+				return false;
 			}
+			
+			modeldata::Model *model = new modeldata::Model();
+			if (!load(settings, model)) {
+				delete model;
+				return false;
+			}
+			
+			model->animations = model2->animations;
+			
+			if (settings->verbose) {
+				info(model);
+			}
+			if (save(settings, model)){
+				result = true;
+			}
+			
+			model->animations.clear();
+			
 			delete model;
-			return result;
+			delete model2;
+			return false;
+#else
+			modeldata::Model *model = new modeldata::Model();
+
+			if (!load(settings, model)) {
+				delete model;
+				return false;
+			}
+
+			if (settings->verbose)
+				info(model);
+
+			for (const std::string& fname : settings->extAnimInFiles) {
+				Settings animSettings = *settings;
+				animSettings.inFile = fname;
+
+				modeldata::Model* animModel = new modeldata::Model();
+				if (!load(&animSettings, animModel)) {
+					delete model;
+					delete animModel;
+					return false;
+				}
+
+				if (animSettings.verbose)
+					info(animModel);
+
+				if (!mergeAnimations(model, animModel)) {
+					delete model;
+					delete animModel;
+					return false;
+				}
+
+				delete animModel;
+			}
+
+			if (!save(settings, model)) {
+				delete model;
+				return false;
+			} else {
+				delete model;
+				return true;
+			}
+#endif
 		}
 
 		readers::Reader *createReader(const Settings * const &settings) {
@@ -187,6 +250,66 @@ class FbxConv {
 				log->verbose(log::iModelInfoNodesSummary, model->nodes.size(), model->getTotalNodeCount(), model->getTotalNodePartCount());
 				log->verbose(log::iModelInfoMaterialsSummary, model->materials.size(), model->getTotalTextureCount());
 			}
+		}
+	
+		bool mergeAnimations(modeldata::Model* dstModel, modeldata::Model* srcModel, std::pair<int, int>* newAnimScope = nullptr) {
+			if (dstModel->animations.empty()) return false;
+			if (srcModel->animations.empty()) return false;
+			
+			Animation* dstAnim = dstModel->animations.front();
+			Animation* srcAnim = srcModel->animations.front();
+			
+			double dstDuration = dstAnim->length;
+			double srcDuration = srcAnim->length;
+			double space = (dstDuration != 0) ? 0.5 : 0;
+			double newDuration = srcDuration + dstDuration + space;
+			
+			if (newDuration != srcDuration) {
+				for (auto dstAnimNode : dstAnim->nodeAnimations) {
+					for (auto dstKey : dstAnimNode->keyframes) {
+						dstKey->time = dstKey->time * dstDuration / newDuration;
+					}
+				}
+				
+				for (auto srcAnimNode : srcAnim->nodeAnimations) {
+					for (auto srcKey : srcAnimNode->keyframes) {
+						srcKey->time = (dstDuration + space + srcKey->time * srcDuration) / newDuration;
+					}
+				}
+			}
+			
+			
+			for (auto srcAnimNode : srcAnim->nodeAnimations) {
+				Node* dstNode = dstModel->getNode(srcAnimNode->node->id.c_str());
+				if (!dstNode) return false;
+				
+				NodeAnimation* dstAnimNode = nullptr;
+				for (auto dstAnimNodeIt : dstAnim->nodeAnimations) {
+					if (dstAnimNodeIt->node->id == srcAnimNode->node->id) {
+						dstAnimNode = dstAnimNodeIt;
+						break;
+					}
+				}
+				
+				if (dstAnimNode) {
+					dstAnimNode->keyframes.insert(dstAnimNode->keyframes.end(), srcAnimNode->keyframes.begin(), srcAnimNode->keyframes.end());
+				} else {
+					dstAnimNode = new NodeAnimation(*srcAnimNode);
+					dstAnimNode->node = dstNode;
+					dstAnim->nodeAnimations.push_back(dstAnimNode);
+				}
+				srcAnimNode->keyframes.clear();
+			}
+			
+			srcAnim->length = 0;
+			dstAnim->length = newDuration;
+		
+			if (newAnimScope) {
+				newAnimScope->first = (srcDuration + space);
+				newAnimScope->second = (newDuration);
+			}
+			
+			return true;
 		}
 	};
 }

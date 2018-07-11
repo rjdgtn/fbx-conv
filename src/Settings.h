@@ -76,6 +76,8 @@ struct Settings {
     COMPRESS_LEVEL compressLevel;
     /** export specific part*/
     EXPORT_PART exportPart;
+	/** Merge external animation files*/
+	std::vector<std::string> extAnimInFiles;
 };
 
 }

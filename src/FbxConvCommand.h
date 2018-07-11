@@ -76,7 +76,7 @@ struct FbxConvCommand {
 					settings->maxNodePartBonesCount = atoi(argv[++i]);
 				//else if ((arg[1] == 'w') && (i + 1 < argc))
 				//	settings->maxVertexBonesCount = atoi(argv[++i]);
-				else if ((arg[1] == 'm') && (i + 1 < argc))
+				else if ((strcmp(arg, "-m") == 0) && (i + 1 < argc))
 					settings->maxVertexCount = settings->maxIndexCount = atoi(argv[++i]);
                 else if((arg[1] == 'c') && (i + 1 < argc))
                     settings->compressLevel = (COMPRESS_LEVEL)atoi(argv[++i]);
@@ -92,7 +92,13 @@ struct FbxConvCommand {
                     settings->exportPart = EXPORT_PART_ANIMATION;
                 else if(arg[1] == 'p')
                     settings->normalMap = true;
-				else
+				else if(strcmp(arg, "-ma") == 0) {
+					while (i + 2 < argc && argv[i+1][0] != '-') {
+						settings->extAnimInFiles.push_back(argv[i+1]);
+						++i;
+					}
+					if (settings->extAnimInFiles.empty()) error = log::eCommandLineMissingInputFile;
+				} else
 					log->error(error = log::eCommandLineUnknownOption, arg);
 			}
 			else if (settings->inFile.length() < 1)
