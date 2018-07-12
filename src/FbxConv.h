@@ -92,38 +92,6 @@ class FbxConv {
 		}
 
 		bool execute(Settings * const &settings) {
-#if 0
-			bool result = false;
-			
-			Settings settings2 = *settings;
-			settings2.inFile = "./cube_anim1.fbx";
-			modeldata::Model *model2 = new modeldata::Model();
-			if (!load(&settings2, model2)) {
-				delete model2;
-				return false;
-			}
-			
-			modeldata::Model *model = new modeldata::Model();
-			if (!load(settings, model)) {
-				delete model;
-				return false;
-			}
-			
-			model->animations = model2->animations;
-			
-			if (settings->verbose) {
-				info(model);
-			}
-			if (save(settings, model)){
-				result = true;
-			}
-			
-			model->animations.clear();
-			
-			delete model;
-			delete model2;
-			return false;
-#else
 			modeldata::Model *model = new modeldata::Model();
 
 			if (!load(settings, model)) {
@@ -133,7 +101,7 @@ class FbxConv {
 
 			if (settings->verbose)
 				info(model);
-
+			
 			for (const std::string& fname : settings->extAnimInFiles) {
 				Settings animSettings = *settings;
 				animSettings.inFile = fname;
@@ -147,12 +115,15 @@ class FbxConv {
 
 				if (animSettings.verbose)
 					info(animModel);
-
-				if (!mergeAnimations(model, animModel)) {
+				
+				std::pair<float, float> newAnimScope;
+				if (!mergeAnimations(model, animModel, &newAnimScope)) {
 					delete model;
 					delete animModel;
 					return false;
 				}
+				
+				std::cout << "ANIM_MERGE:" << " " << newAnimScope.first << " " << newAnimScope.second << " " << fname << std::endl ;
 
 				delete animModel;
 			}
@@ -233,6 +204,7 @@ class FbxConv {
 				file.AddModel(model);
 				file.saveBinary(out);
 				log->status(log::sExportToG3DB, out.c_str());
+				result = true;
 			}
 
 			log->status(log::sExportClose);
@@ -252,8 +224,11 @@ class FbxConv {
 			}
 		}
 	
-		bool mergeAnimations(modeldata::Model* dstModel, modeldata::Model* srcModel, std::pair<int, int>* newAnimScope = nullptr) {
-			if (dstModel->animations.empty()) return false;
+	
+		bool mergeAnimations(modeldata::Model* dstModel, modeldata::Model* srcModel, std::pair<float, float>* newAnimScope = nullptr) {
+			if (dstModel->animations.empty()) {
+				dstModel->animations.push_back(new Animation());
+			}
 			if (srcModel->animations.empty()) return false;
 			
 			Animation* dstAnim = dstModel->animations.front();
@@ -261,7 +236,7 @@ class FbxConv {
 			
 			double dstDuration = dstAnim->length;
 			double srcDuration = srcAnim->length;
-			double space = (dstDuration != 0) ? 0.5 : 0;
+			double space = (dstDuration != 0) ? 1/15.0 : 0.0;
 			double newDuration = srcDuration + dstDuration + space;
 			
 			if (newDuration != srcDuration) {
@@ -305,7 +280,7 @@ class FbxConv {
 			dstAnim->length = newDuration;
 		
 			if (newAnimScope) {
-				newAnimScope->first = (srcDuration + space);
+				newAnimScope->first = (dstDuration + space);
 				newAnimScope->second = (newDuration);
 			}
 			
