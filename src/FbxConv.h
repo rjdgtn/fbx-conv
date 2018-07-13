@@ -135,7 +135,6 @@ class FbxConv {
 				delete model;
 				return true;
 			}
-#endif
 		}
 
 		readers::Reader *createReader(const Settings * const &settings) {
