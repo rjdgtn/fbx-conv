@@ -236,7 +236,7 @@ class FbxConv {
 			
 			double dstDuration = dstAnim->length;
 			double srcDuration = srcAnim->length;
-			double space = (dstDuration != 0) ? 1/15.0 : 0.0;
+			double space = 1/15.0;
 			double newDuration = srcDuration + dstDuration + space;
 			
 			if (newDuration != srcDuration) {

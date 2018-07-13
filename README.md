@@ -31,6 +31,7 @@ Command-line USAGE:
 *   **`-c <size>`**			-The compression level: 0 , 1 (default: 0)
 *   **`-l`**       			-Export model data only.
 *   **`-j`**       			-Export animation data only.
+*   **`-ma <ext_anim_file_1.fbx ext_anim_file_2.fbx ...>`** -Merge animations to result file and print new timings
 
 ###Example
 `fbx-conv -a boss.FBX`
